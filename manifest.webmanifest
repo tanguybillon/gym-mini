@@ -1,11 +1,10 @@
 {
   "name": "Gym Mini",
   "short_name": "Gym Mini",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "./",
   "display": "standalone",
-  "background_color": "#111513",
-  "theme_color": "#111513",
+  "background_color": "#0b0b0c",
+  "theme_color": "#0b0b0c",
   "icons": [
     {
       "src": "icon-192.png",
@@ -17,7 +16,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "lang": "fr",
-  "description": "Une série à la fois. Ton carnet de musculation, simplement."
+  ]
 }
