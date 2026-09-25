@@ -212,7 +212,8 @@
   <div class="setting"><label>Pas du bouton + / − poids</label><select id="stepSelect"><option value="1">1</option><option value="2.5">2,5</option><option value="5">5</option></select></div>
   <div class="setting"><label>Répétitions par défaut si aucun historique</label><input id="defaultReps" type="number" inputmode="numeric" min="1" max="50" /></div>
   <div class="setting"><label>Chrono automatique après chaque série</label><select id="autoRestSelect"><option value="yes">Oui — 2:00</option><option value="no">Non</option></select></div>
-  <div class="setting"><label>Mode repos / musique</label><select id="restModeSelect"><option value="visual">Chrono dans l’app uniquement</option><option value="clean">Pause musique à 0:00 — mode propre</option><option value="system">Minuteur iPhone — fonctionne écran verrouillé</option></select><div class="sub" style="margin-top:7px"><b>Mode propre recommandé :</b> aucun minuteur Horloge, donc pas de minuteur persistant dans la Dynamic Island. À 0:00 l’app appelle brièvement le raccourci <b>Gym Pause Music</b>, puis revient sur la série en cours. Si l’app est suspendue/verrouillée, la pause peut attendre la réouverture. Le mode « Minuteur iPhone » reste disponible si tu veux un arrêt exact même écran verrouillé.</div></div>
+  <div class="setting"><label>Mode repos / musique</label><select id="restModeSelect"><option value="visual">Chrono dans l’app uniquement</option><option value="clean">Pause musique à 0:00 — retour vers Gym Mini</option><option value="system">Minuteur iPhone — fonctionne écran verrouillé</option></select><div class="sub" style="margin-top:7px"><b>Mode propre recommandé :</b> à 0:00 l’app lance brièvement <b>Gym Pause Music</b>. Le retour utilise maintenant l’adresse iOS <b>webapp://</b> de Gym Mini au lieu d’une URL https : l’objectif est de rouvrir l’app installée, pas Safari. La séance en cours reste mémorisée et reprend automatiquement.</div></div>
+  <div class="setting"><div class="sub" id="pwaReturnUrl" style="word-break:break-all;margin-bottom:8px"></div><button class="smallBtn" id="copyPwaUrl" style="width:100%">Copier l’URL de retour Gym Mini</button></div>
   <div class="setting"><button class="smallBtn" id="openShortcutSetup" style="width:100%">Ouvrir Raccourcis</button></div>
   <div class="setting"><button class="smallBtn" id="testRestBtn" style="width:100%">Tester le repos 2 min</button></div>
   <div class="setting"><button class="smallBtn" id="exportCsv" style="width:100%">Exporter CSV</button></div>
@@ -374,7 +375,7 @@ function updateRestBar(){
     bar.classList.remove('hidden');bar.classList.add('ready');
     document.getElementById('restTime').textContent='GO';
     document.getElementById('restTitle').textContent='Repos terminé';
-    document.getElementById('restSub').textContent=completedMode==='clean'?'Pause musique… puis retour ici.':'Prochaine série.';
+    document.getElementById('restSub').textContent=completedMode==='clean'?'Pause musique… puis retour dans Gym Mini.':'Prochaine série.';
     clearTimeout(updateRestBar.hideTimer);updateRestBar.hideTimer=setTimeout(()=>{bar.classList.add('hidden');bar.classList.remove('ready');},5000);
     if(restTicker){clearInterval(restTicker);restTicker=null;}
     if(completedMode==='clean' && /iPhone|iPad|iPod/i.test(navigator.userAgent)){
@@ -386,7 +387,7 @@ function updateRestBar(){
   document.getElementById('restTime').textContent=formatCountdown(remaining);
   document.getElementById('restTitle').textContent='Repos';
   const mode=state.active.restMode||state.settings.restMode||'visual';
-  document.getElementById('restSub').textContent=mode==='clean'?'À 0:00 : pause musique puis retour à la série.':mode==='system'?'Minuteur iPhone actif — fonctionne écran verrouillé.':'Chrono local — aucun appel à Raccourcis.';
+  document.getElementById('restSub').textContent=mode==='clean'?'À 0:00 : pause musique puis retour vers l’app Gym Mini.':mode==='system'?'Minuteur iPhone actif — fonctionne écran verrouillé.':'Chrono local — aucun appel à Raccourcis.';
 }
 function startVisualRest(seconds=120,mode='visual'){
   if(!state.active)return;
@@ -398,17 +399,24 @@ function cancelRest(){
   if(restTicker){clearInterval(restTicker);restTicker=null;}
   document.getElementById('restBar')?.classList.add('hidden');
 }
-function currentReturnUrl(){
-  const base=location.href.split('#')[0].split('?')[0];
-  return base+'?resume=1';
+function currentPwaReturnUrl(){
+  // iOS Home Screen web apps can be targeted with the webapp:// scheme.
+  // Keep the exact installed path and, critically, its trailing slash.
+  let path=location.pathname||'/';
+  if(!path.endsWith('/')){
+    const last=path.split('/').pop()||'';
+    if(last.includes('.')) path=path.slice(0,path.lastIndexOf('/')+1);
+    else path+='/';
+  }
+  return `webapp://${location.host}${path}`;
 }
 function launchIOSPauseShortcut(){
-  const callback=encodeURIComponent(currentReturnUrl());
+  const callback=encodeURIComponent(currentPwaReturnUrl());
   const u=`shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent('Gym Pause Music')}&x-success=${callback}&x-cancel=${callback}&x-error=${callback}`;
   window.location.href=u;
 }
 function launchIOSRestShortcut(){
-  const callback=encodeURIComponent(currentReturnUrl());
+  const callback=encodeURIComponent(currentPwaReturnUrl());
   const u=`shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent('Gym Rest 2m')}&x-success=${callback}&x-cancel=${callback}&x-error=${callback}`;
   window.location.href=u;
 }
@@ -712,7 +720,7 @@ function exportCsv(){
 }
 function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);}
 
-function openSettings(){ensureSettings();document.getElementById('unitSelect').value=state.settings.unit;document.getElementById('stepSelect').value=state.settings.step;document.getElementById('defaultReps').value=state.settings.defaultReps;document.getElementById('autoRestSelect').value=state.settings.autoRest?'yes':'no';document.getElementById('restModeSelect').value=state.settings.restMode||'visual';document.getElementById('settingsSheet').classList.remove('hidden');}
+function openSettings(){ensureSettings();document.getElementById('unitSelect').value=state.settings.unit;document.getElementById('stepSelect').value=state.settings.step;document.getElementById('defaultReps').value=state.settings.defaultReps;document.getElementById('autoRestSelect').value=state.settings.autoRest?'yes':'no';document.getElementById('restModeSelect').value=state.settings.restMode||'visual';document.getElementById('pwaReturnUrl').textContent='Retour PWA : '+currentPwaReturnUrl();document.getElementById('settingsSheet').classList.remove('hidden');}
 function closeSheet(id){document.getElementById(id).classList.add('hidden');}
 
 // Events
@@ -730,6 +738,7 @@ stepSelect.onchange=e=>{state.settings.step=Number(e.target.value);saveState();}
 defaultReps.onchange=e=>{state.settings.defaultReps=Math.max(1,parseInt(e.target.value)||8);saveState();};
 autoRestSelect.onchange=e=>{state.settings.autoRest=e.target.value==='yes';saveState();};
 restModeSelect.onchange=e=>{state.settings.restMode=e.target.value;saveState();};
+copyPwaUrl.onclick=async()=>{const u=currentPwaReturnUrl();try{await navigator.clipboard.writeText(u);toast('URL Gym Mini copiée');}catch{prompt('Copie cette URL dans Raccourcis :',u);}};
 openShortcutSetup.onclick=()=>{window.location.href='shortcuts://create-shortcut';};
 testRestBtn.onclick=()=>{startRest(120,state.settings.restMode||'visual');closeSheet('settingsSheet');};
 restSkip.onclick=cancelRest;
